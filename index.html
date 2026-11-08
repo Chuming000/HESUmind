@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HESUmind · LLM 学习教程</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/dark.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <style>
+    :root {
+      --theme-color: #a78bfa;
+    }
+    body {
+      background: #0d1117;
+    }
+    .sidebar {
+      background: #0d1117;
+      border-right: 1px solid #21262d;
+    }
+    .sidebar ul li a {
+      color: #c9d1d9;
+    }
+    .sidebar ul li.active > a,
+    .sidebar ul li a:hover {
+      color: #a78bfa;
+    }
+    .markdown-section {
+      max-width: 860px;
+      color: #c9d1d9;
+      font-size: 15px;
+      line-height: 1.75;
+    }
+    .markdown-section h1 {
+      font-size: 26px;
+      border-bottom: 1px solid #21262d;
+      padding-bottom: 10px;
+    }
+    .markdown-section h2 {
+      font-size: 21px;
+      border-bottom: 1px solid #21262d;
+      padding-bottom: 8px;
+      margin-top: 40px;
+    }
+    .markdown-section h3 {
+      font-size: 17px;
+    }
+    .markdown-section img {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+    }
+    .markdown-section table {
+      display: table;
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .markdown-section tr:nth-child(2n) {
+      background: #161b22;
+    }
+    .markdown-section th,
+    .markdown-section td {
+      border: 1px solid #30363d;
+      padding: 8px 12px;
+    }
+    .markdown-section code {
+      background: #161b22;
+      color: #e6edf3;
+    }
+    .markdown-section pre {
+      background: #161b22;
+      border: 1px solid #21262d;
+    }
+    .markdown-section blockquote {
+      border-left: 3px solid #a78bfa;
+      background: #161b22;
+      color: #9aa4af;
+      padding: 8px 16px;
+    }
+    .sidebar-toggle {
+      background: #161b22;
+    }
+    .app-nav a {
+      color: #9aa4af;
+    }
+    .app-nav a:hover {
+      color: #a78bfa;
+    }
+    .cover-main h1 {
+      color: #a78bfa;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">正在加载…</div>
+
+  <script>
+    window.$docsify = {
+      name: 'HESUmind',
+      repo: 'Chuming000/HESUmind',
+      loadSidebar: true,
+      relativePath: true,
+      coverpage: true,
+      subMaxLevel: 2,
+      auto2top: true,
+      homepage: 'tutorial/README.md',
+      notFoundPage: false,
+      search: {
+        placeholder: '搜索组件、论文、面试题…',
+        noData: '没有结果',
+        depth: 3
+      },
+      copyCode: {
+        buttonText: '复制',
+        errorText: '复制失败',
+        successText: '已复制'
+      }
+    }
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/front-matter.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@3/dist/docsify-copy-code.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-katex@1/dist/docsify-katex.js"></script>
+</body>
+</html>
