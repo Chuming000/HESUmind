@@ -45,7 +45,7 @@ $$
 \text{LN}(x) = \gamma \odot \frac{x-\mu}{\sqrt{\sigma^2+\epsilon}} + \beta
 $$
 
-其中 $\gamma,\beta \in \mathbb{R}^d$ 是可学习参数，$\epsilon$ 防止除零。
+其中 $\gamma,\beta \in \mathbb{R}^d$ 是可学习参数， $\epsilon$ 防止除零。
 
 注意方差用的是**有偏估计**（除以 $d$ 而不是 $d-1$），PyTorch 的 `nn.LayerNorm` 也是这么算的。
 
@@ -98,7 +98,7 @@ class RMSNorm(nn.Module):
 写法是 $\sqrt{\text{ms}+\epsilon}$ 而不是 $\sqrt{\text{ms}}+\epsilon$。差别在数值上：当 $\text{ms}$ 极小时，前者让分母有下界，后者会让分母趋近 $\epsilon$ 但分子仍可能爆掉。加在里面更稳。
 
 **④ 为什么必须 `.float()`**
-FP16 的最大值是 65504。一个隐藏向量里只要出现 $|x| > 256$，$x^2$ 就溢出了，`mean` 得到 `inf`，`rsqrt` 得到 `0`，整个 token 的输出变成 0——而且是静默的，不会报错。转成 FP32 算完再转回去，是 LLaMA 等实现的标准做法。
+FP16 的最大值是 65504。一个隐藏向量里只要出现 $|x| > 256$， $x^2$ 就溢出了，`mean` 得到 `inf`，`rsqrt` 得到 `0`，整个 token 的输出变成 0——而且是静默的，不会报错。转成 FP32 算完再转回去，是 LLaMA 等实现的标准做法。
 
 **⑤ 为什么最后要 `.to(x.dtype)`**
 输入是 BF16、中间算 FP32，如果直接返回 FP32，下一层的 Linear 会做一次隐式类型提升，既慢又可能引发 mixed-precision 相关的报错。显式转回去，行为才可预期。
@@ -218,11 +218,11 @@ Post-LN（原始 Transformer）是 `x = LN(x + Sublayer(x))`，归一化在残�
 
 **Q4：为什么 RMSNorm 里要把输入转成 FP32？**
 
-FP16 的最大值是 65504。隐藏向量里只要出现 $|x|>256$，$x^2$ 就溢出成 `inf`，均值变 `inf`，`rsqrt` 返回 0，整个 token 被静默清零。BF16 虽然动态范围够，但尾数只有 7 位，平方后精度损失明显。所以归一化内部统一用 FP32 算，出口再转回原 dtype。
+FP16 的最大值是 65504。隐藏向量里只要出现 $|x|>256$， $x^2$ 就溢出成 `inf`，均值变 `inf`，`rsqrt` 返回 0，整个 token 被静默清零。BF16 虽然动态范围够，但尾数只有 7 位，平方后精度损失明显。所以归一化内部统一用 FP32 算，出口再转回原 dtype。
 
 **Q5：RMSNorm 能不能和相邻的线性层融合？**
 
-能，而且这是它比 LayerNorm 更好优化的原因之一。RMSNorm 只依赖单个 token 自己的向量（不跨 token），且只有缩放没有平移，$\gamma$ 可以直接吸收进后续 Linear 的权重里，推理时省掉一次独立的 norm kernel。这也是为什么很多推理框架会对 Pre-Norm 结构做 fold。
+能，而且这是它比 LayerNorm 更好优化的原因之一。RMSNorm 只依赖单个 token 自己的向量（不跨 token），且只有缩放没有平移， $\gamma$ 可以直接吸收进后续 Linear 的权重里，推理时省掉一次独立的 norm kernel。这也是为什么很多推理框架会对 Pre-Norm 结构做 fold。
 
 **Q6：为什么 LayerNorm 有 bias，RMSNorm 没有？**
 
