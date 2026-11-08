@@ -42,7 +42,7 @@
 
 <div align="center">
 
-![三种 FFN 结构对比](assets/ffn-compare.svg)
+![三种 FFN 结构对比](assets/ffn-compare-v2.svg)
 
 </div>
 

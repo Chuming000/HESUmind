@@ -70,7 +70,7 @@ python FFN/ffn.py
 
 ## 一张图看懂三种 FFN
 
-![三种 FFN 结构对比](../assets/ffn-compare.svg)
+![三种 FFN 结构对比](../assets/ffn-compare-v2.svg)
 
 同样是「升维 → 非线性 → 降维」这件事，三种写法在参数效率和表达能力上做了不同的取舍：
 
