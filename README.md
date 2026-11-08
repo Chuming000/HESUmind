@@ -14,6 +14,8 @@
 [![组件](https://img.shields.io/badge/组件-5%20个-3FB950)](tutorial/README.md)
 [![Stars](https://img.shields.io/github/stars/Chuming000/HESUmind?style=flat&label=Stars&color=8B5CF6)](https://github.com/Chuming000/HESUmind/stargazers)
 
+[![在线阅读](https://img.shields.io/badge/%F0%9F%93%96%20在线阅读-chuming000.github.io%2FHESUmind-8B5CF6?style=flat)](https://chuming000.github.io/HESUmind/)
+
 </div>
 
 ---
