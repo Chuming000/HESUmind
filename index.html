@@ -88,6 +88,36 @@
     .cover-main h1 {
       color: #a78bfa;
     }
+    /* 覆盖 docsify 默认的浅色封面渐变 */
+    section.cover {
+      background: radial-gradient(circle at 50% 0%, #1c2333 0%, #0d1117 55%) !important;
+    }
+    section.cover .cover-main h1 {
+      color: #a78bfa !important;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+    section.cover .cover-main blockquote p {
+      color: #c9d1d9 !important;
+      font-size: 17px;
+    }
+    section.cover .cover-main p {
+      color: #9aa4af !important;
+    }
+    section.cover .cover-main > p:last-child a {
+      border-radius: 6px;
+      border: 1px solid #a78bfa;
+      color: #a78bfa;
+      padding: 10px 24px;
+    }
+    section.cover .cover-main > p:last-child a:last-child {
+      background: #a78bfa;
+      color: #0d1117;
+      border-color: #a78bfa;
+    }
+    section.cover .cover-main > p:last-child a:hover {
+      opacity: 0.85;
+    }
   </style>
 </head>
 <body>
