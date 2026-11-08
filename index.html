@@ -57,12 +57,18 @@
     .markdown-section tr:nth-child(2n) {
       background: #161b22;
     }
-    .markdown-section th,
-    .markdown-section td {
+    .markdown-section table th,
+    .markdown-section table td {
       border: 1px solid #30363d;
       padding: 8px 12px;
     }
-    .markdown-section table th {\n      white-space: nowrap;\n    }\n    .sidebar .search input {\n      width: 100%;\n      box-sizing: border-box;\n      background: #161b22;\n      border: 1px solid #30363d;\n      border-radius: 6px;\n      color: #c9d1d9;\n      padding: 8px 10px;\n      margin: 8px 0;\n    }\n    .sidebar .search {\n      margin: 0;\n      padding: 0 20px;\n    }\n    .markdown-section code {
+    .markdown-section table th {
+      white-space: nowrap;
+    }
+    .markdown-section table td:first-child {
+      white-space: nowrap;
+    }
+    .markdown-section code {
       background: #161b22;
       color: #e6edf3;
     }
@@ -76,19 +82,26 @@
       color: #9aa4af;
       padding: 8px 16px;
     }
-    .sidebar-toggle {
-      background: #161b22;
-    }
     .app-nav a {
       color: #9aa4af;
     }
     .app-nav a:hover {
       color: #a78bfa;
     }
-    .cover-main h1 {
-      color: #a78bfa;
+    .sidebar .search {
+      margin: 0;
+      padding: 0 20px;
     }
-    /* 覆盖 docsify 默认的浅色封面渐变 */
+    .sidebar .search input {
+      width: 100%;
+      box-sizing: border-box;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      padding: 8px 10px;
+      margin: 8px 0;
+    }
     section.cover {
       background: radial-gradient(circle at 50% 0%, #1c2333 0%, #0d1117 55%) !important;
     }
