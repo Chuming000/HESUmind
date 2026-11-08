@@ -64,6 +64,80 @@ class SwiGLUFFN(nn.Module):
         return x
 
 
+# MoE FFN：把一个大 FFN 拆成 N 个专家，每个 token 只走其中 top_k 个
+#
+# 与前面两个 FFN 的区别：
+#   1. 参数量是「总量」而不是「每 token 计算量」——MoE 靠稀疏激活换容量
+#   2. 多一个 router（门控网络），负责给每个 token 选专家
+#   3. 需要负载均衡损失，否则 router 会塌缩到少数几个专家上
+#   4. 专家的中间维度通常与稠密 FFN 持平（Mixtral 的做法），所以总参数量约等于 N 倍
+class MoEFFN(nn.Module):
+    def __init__(self, hidden_size, num_experts=8, top_k=2, expert_hidden=None,
+                 multiple_of=256, bias=False):
+        super().__init__()
+
+        if top_k > num_experts:
+            raise ValueError(f"top_k({top_k}) 不能大于专家数({num_experts})")
+
+        self.num_experts = num_experts
+        self.top_k = top_k
+
+        # 路由网络：给每个 token 打 N 个分，不带 bias（与 LLaMA 系 router 一致）
+        self.router = nn.Linear(hidden_size, num_experts, bias=False)
+
+        # 专家本身就是一个普通的 SwiGLU FFN
+        self.experts = nn.ModuleList(
+            [SwiGLUFFN(hidden_size, expert_hidden, multiple_of, bias)
+             for _ in range(num_experts)]
+        )
+        self.expert_hidden = self.experts[0].intermediate_size
+
+        # 训练时由 forward 写入，供 loss 使用
+        self.aux_loss = None
+
+    def forward(self, x):
+        # x: [Batch, Seq, D]
+        B, T, D = x.shape
+        flat = x.reshape(B * T, D)
+
+        logits = self.router(flat)  # [N, E]
+        probs = F.softmax(logits, dim=-1)  # 每个 token 对 E 个专家的偏好
+        top_p, top_i = torch.topk(probs, self.top_k, dim=-1)  # [N, k]
+
+        # 归一化被选中的权重，使其和为 1（LLaMA 系的做法）
+        top_p = top_p / top_p.sum(dim=-1, keepdim=True)
+
+        out = torch.zeros_like(flat)
+        for e, expert in enumerate(self.experts):
+            # 找出把专家 e 选进 top-k 的 (token, 槽位) 对
+            hit = (top_i == e)  # [N, k]
+            tok, slot = hit.nonzero(as_tuple=True)
+            if tok.numel() == 0:  # 这个专家本轮没人选，直接跳过，省算力
+                continue
+
+            w = top_p[tok, slot]  # [M]，每个命中 token 分到的门控权重
+            y = expert(flat[tok])  # 只把命中的 token 送进这个专家
+            out.index_add_(0, tok, y * w.unsqueeze(-1))
+
+        self.aux_loss = self._aux_loss(probs, top_i)
+        return out.view(B, T, D)
+
+    def _aux_loss(self, probs, top_i):
+        """Switch Transformer 的负载均衡损失：E * sum(f_i * P_i)。
+
+        f_i = 分给专家 i 的 token 占比，P_i = 专家 i 的平均路由概率。
+        两者都均匀（各 1/E）时取最小值 1；全部挤到一个专家上会显著变大。
+        """
+        E = self.num_experts
+        counts = torch.zeros(E, device=probs.device)
+        ones = torch.ones(top_i.numel(), device=probs.device)
+        counts.index_add_(0, top_i.reshape(-1), ones)
+
+        f = counts / counts.sum()  # 实际分配比例
+        P = probs.mean(dim=0)  # 平均路由概率
+        return E * (f * P).sum()
+
+
 if __name__ == "__main__":
     torch.manual_seed(0)
 
@@ -72,6 +146,7 @@ if __name__ == "__main__":
 
     relu_ffn = ReLUFFN(D, 4 * D)
     swiglu_ffn = SwiGLUFFN(D)
+    moe_ffn = MoEFFN(D, num_experts=8, top_k=2)
 
     def count(m):
         return sum(p.numel() for p in m.parameters())
@@ -79,11 +154,29 @@ if __name__ == "__main__":
     print(f"输入: {tuple(x.shape)}\n")
     print(f"{'模块':<12}{'中间维度':>10}{'参数量':>12}{'输出形状':>16}")
     print("-" * 52)
-    for name, m in (("ReLUFFN", relu_ffn), ("SwiGLUFFN", swiglu_ffn)):
+    for name, m in (("ReLUFFN", relu_ffn), ("SwiGLUFFN", swiglu_ffn), ("MoEFFN", moe_ffn)):
         y = m(x)
-        print(f"{name:<12}{m.intermediate_size if hasattr(m, 'intermediate_size') else 4 * D:>10}"
-              f"{count(m):>12,}{str(tuple(y.shape)):>16}")
+        mid = getattr(m, "expert_hidden", None) or getattr(m, "intermediate_size", 4 * D)
+        print(f"{name:<12}{mid:>10}{count(m):>12,}{str(tuple(y.shape)):>16}")
 
     ratio = count(swiglu_ffn) / count(relu_ffn)
     print(f"\n参数量比值 SwiGLU / ReLU = {ratio:.3f}")
     print("对齐到 256 的整数倍会让小模型的比值偏大；D 越大越接近 1.0。")
+
+    # ---- MoE 的稀疏性 ----
+    print("\n--- MoEFFN 稀疏激活 ---")
+    total = count(moe_ffn)
+    per_expert = count(moe_ffn.experts[0])
+    active = count(moe_ffn.router) + per_expert * moe_ffn.top_k
+    print(f"专家数 {moe_ffn.num_experts}，每 token 激活 {moe_ffn.top_k} 个")
+    print(f"总参数量     : {total:,}")
+    print(f"每 token 激活: {active:,}  ({active / total:.1%})")
+
+    # 路由是否均匀：统计每个专家被选中的次数
+    with torch.no_grad():
+        flat = x.reshape(-1, D)
+        probs = F.softmax(moe_ffn.router(flat), dim=-1)
+        _, top_i = torch.topk(probs, moe_ffn.top_k, dim=-1)
+        load = torch.bincount(top_i.reshape(-1), minlength=moe_ffn.num_experts)
+    print(f"专家负载分布 : {load.tolist()}  （未训练，接近随机是正常的）")
+    print(f"负载均衡损失 : {moe_ffn.aux_loss.item():.4f}  （均匀约 1.0，越大越不均衡）")

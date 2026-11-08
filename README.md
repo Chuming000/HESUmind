@@ -5,5 +5,5 @@
 ## 目录
 
 - `norm/` — 归一化层手写实现（RMSNorm、LayerNorm）
-- `FFN/` — 前馈网络实现（ReLU FFN、SwiGLU FFN）
+- `FFN/` — 前馈网络实现（ReLU FFN、SwiGLU FFN、MoE FFN）
 - `optimizer/` — 优化器实现（待补充）
