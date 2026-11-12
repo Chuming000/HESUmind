@@ -34,6 +34,7 @@
 | 前馈网络 | ReLU FFN | [`FFN/ffn.py`](FFN/ffn.py) | [02 · ReLU FFN](tutorial/02-ffn-relu.md) | ✅ |
 | 前馈网络 | SwiGLU FFN | [`FFN/ffn.py`](FFN/ffn.py) | [03 · SwiGLU FFN](tutorial/03-ffn-swiglu.md) | ✅ |
 | 前馈网络 | MoE FFN | [`FFN/ffn.py`](FFN/ffn.py) | [04 · MoE FFN](tutorial/04-ffn-moe.md) | ✅ |
+| 前馈网络 | Shared-Expert MoE | [`FFN/ffn.py`](FFN/ffn.py) | [04 · 第 10 节](tutorial/04-ffn-moe.md#10-进阶带共享专家的-modeepseekmoe) | ✅ |
 | 优化器 | AdamW / Muon | `optimizer/` | — | 🚧 |
 | 注意力 | MHA → GQA → MLA | `attention/` | — | ⏳ |
 | 位置编码 | RoPE | `position/` | — | ⏳ |
@@ -55,6 +56,7 @@
 | ReLU FFN | 2 | 4D = 2048 | 2,099,712 | 100% |
 | SwiGLU FFN | 3 | 8/3D → 1536 | 2,359,296 | 100% |
 | MoE FFN（8 专家 top-2） | 3×8 + router | 1536 | 18,878,464 | 25.0% |
+| Shared-Expert MoE（+1 共享） | 3×9 + router | 1536 | 21,237,760 | 33.3% |
 
 ## 快速开始
 

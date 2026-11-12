@@ -37,7 +37,7 @@
 | :-- | :-- | :-- |
 | [02 · ReLU FFN](02-ffn-relu.md) | 最经典的升维-激活-降维，以及 4D 惯例从哪来 | [`FFN/ffn.py`](../FFN/ffn.py) |
 | [03 · SwiGLU FFN](03-ffn-swiglu.md) | 门控怎么加，为什么中间维度是 8/3 D 而不是 4D | [`FFN/ffn.py`](../FFN/ffn.py) |
-| [04 · MoE FFN](04-ffn-moe.md) | 稀疏激活、top-k 路由、负载均衡损失 | [`FFN/ffn.py`](../FFN/ffn.py) |
+| [04 · MoE FFN](04-ffn-moe.md) | 稀疏激活、top-k 路由、负载均衡损失；第 10 节含共享专家版本 | [`FFN/ffn.py`](../FFN/ffn.py) |
 
 ### 待补充
 
@@ -79,6 +79,7 @@ python FFN/ffn.py
 | ReLU FFN | 2 | 4D = 2048 | 2,099,712 | 100% |
 | SwiGLU FFN | 3 | 8/3 D → 1536 | 2,359,296 | 100% |
 | MoE FFN（8 专家 top-2） | 3 × 8 + router | 1536 | 18,878,464 | 25.0% |
+| Shared-Expert MoE（+1 共享） | 3 × 9 + router | 1536 | 21,237,760 | 33.3% |
 
 ---
 

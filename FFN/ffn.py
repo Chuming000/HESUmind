@@ -138,6 +138,94 @@ class MoEFFN(nn.Module):
         return E * (f * P).sum()
 
 
+# Shared-Expert MoE FFN：在 MoE 的基础上加「共享专家」
+#
+# DeepSeekMoE（DeepSeek-V2 / V3）的做法：
+#   1. 一部分专家是「共享专家」(shared expert)，每个 token 都必过，不经过 router
+#   2. 另一部分是「路由专家」(routed expert)，仍然由 router 选 top-k
+#
+# 为什么要这么做：
+#   - 共享专家负责承载「所有 token 都需要」的公共知识（语法、常见搭配）
+#   - 路由专家只需要学「差异化」的部分，不必每个专家都重复学一遍公共知识
+#   - 结果是在同样的总参数量下，专家的「专业化程度」更高，冗余更少
+#
+# 与 MoEFFN 的区别：
+#   1. 多一个 shared_experts 模块，不走 router，所有 token 无条件通过
+#   2. 负载均衡损失只统计路由专家（共享专家本来就人人有份，不需要均衡）
+#   3. 每 token 激活参数 = 共享专家 + top_k 个路由专家，比纯 MoE 多一份固定开销
+class SharedExpertMoEFFN(nn.Module):
+    def __init__(self, hidden_size, num_experts=8, top_k=2, num_shared=1,
+                 expert_hidden=None, shared_hidden=None,
+                 multiple_of=256, bias=False):
+        super().__init__()
+
+        if top_k > num_experts:
+            raise ValueError(f"top_k({top_k}) 不能大于路由专家数({num_experts})")
+
+        self.num_experts = num_experts
+        self.top_k = top_k
+        self.num_shared = num_shared
+
+        # 路由网络：只在路由专家里选，共享专家不参与
+        self.router = nn.Linear(hidden_size, num_experts, bias=False)
+
+        # 路由专家：被 top-k 选中的 token 才会进来
+        self.experts = nn.ModuleList(
+            [SwiGLUFFN(hidden_size, expert_hidden, multiple_of, bias)
+             for _ in range(num_experts)]
+        )
+        self.expert_hidden = self.experts[0].intermediate_size
+
+        # 共享专家：所有 token 无条件通过，相当于一个「人人有份」的稠密分支
+        self.shared_experts = nn.ModuleList(
+            [SwiGLUFFN(hidden_size, shared_hidden, multiple_of, bias)
+             for _ in range(num_shared)]
+        )
+        self.shared_hidden = self.shared_experts[0].intermediate_size if num_shared else 0
+
+        self.aux_loss = None
+
+    def forward(self, x):
+        # x: [Batch, Seq, D]
+        B, T, D = x.shape
+        flat = x.reshape(B * T, D)
+
+        # --- 共享分支：所有 token 全走，不做路由 ---
+        out = torch.zeros_like(flat)
+        for shared in self.shared_experts:
+            out = out + shared(flat)
+
+        # --- 路由分支：每个 token 选 top-k 个专家 ---
+        logits = self.router(flat)  # [N, E]
+        probs = F.softmax(logits, dim=-1)
+        top_p, top_i = torch.topk(probs, self.top_k, dim=-1)
+        top_p = top_p / top_p.sum(dim=-1, keepdim=True)
+
+        for e, expert in enumerate(self.experts):
+            hit = (top_i == e)  # [N, k]
+            tok, slot = hit.nonzero(as_tuple=True)
+            if tok.numel() == 0:
+                continue
+            w = top_p[tok, slot]
+            y = expert(flat[tok])
+            out.index_add_(0, tok, y * w.unsqueeze(-1))
+
+        # 负载均衡只约束路由专家
+        self.aux_loss = self._aux_loss(probs, top_i)
+        return out.view(B, T, D)
+
+    def _aux_loss(self, probs, top_i):
+        """Switch Transformer 的负载均衡损失，只统计路由专家。"""
+        E = self.num_experts
+        counts = torch.zeros(E, device=probs.device)
+        ones = torch.ones(top_i.numel(), device=probs.device)
+        counts.index_add_(0, top_i.reshape(-1), ones)
+
+        f = counts / counts.sum()
+        P = probs.mean(dim=0)
+        return E * (f * P).sum()
+
+
 if __name__ == "__main__":
     torch.manual_seed(0)
 
@@ -147,17 +235,19 @@ if __name__ == "__main__":
     relu_ffn = ReLUFFN(D, 4 * D)
     swiglu_ffn = SwiGLUFFN(D)
     moe_ffn = MoEFFN(D, num_experts=8, top_k=2)
+    shared_moe = SharedExpertMoEFFN(D, num_experts=8, top_k=2, num_shared=1)
 
     def count(m):
         return sum(p.numel() for p in m.parameters())
 
     print(f"输入: {tuple(x.shape)}\n")
-    print(f"{'模块':<12}{'中间维度':>10}{'参数量':>12}{'输出形状':>16}")
-    print("-" * 52)
-    for name, m in (("ReLUFFN", relu_ffn), ("SwiGLUFFN", swiglu_ffn), ("MoEFFN", moe_ffn)):
+    print(f"{'模块':<20}{'中间维度':>10}{'参数量':>12}{'输出形状':>16}")
+    print("-" * 60)
+    for name, m in (("ReLUFFN", relu_ffn), ("SwiGLUFFN", swiglu_ffn),
+                    ("MoEFFN", moe_ffn), ("SharedExpertMoEFFN", shared_moe)):
         y = m(x)
         mid = getattr(m, "expert_hidden", None) or getattr(m, "intermediate_size", 4 * D)
-        print(f"{name:<12}{mid:>10}{count(m):>12,}{str(tuple(y.shape)):>16}")
+        print(f"{name:<20}{mid:>10}{count(m):>12,}{str(tuple(y.shape)):>16}")
 
     ratio = count(swiglu_ffn) / count(relu_ffn)
     print(f"\n参数量比值 SwiGLU / ReLU = {ratio:.3f}")
@@ -180,3 +270,25 @@ if __name__ == "__main__":
         load = torch.bincount(top_i.reshape(-1), minlength=moe_ffn.num_experts)
     print(f"专家负载分布 : {load.tolist()}  （未训练，接近随机是正常的）")
     print(f"负载均衡损失 : {moe_ffn.aux_loss.item():.4f}  （均匀约 1.0，越大越不均衡）")
+
+    # ---- 共享专家：多一份恒定开销，换来更干净的分工 ----
+    print("\n--- SharedExpertMoEFFN vs MoEFFN ---")
+    total_s = count(shared_moe)
+    shared_p = sum(count(m) for m in shared_moe.shared_experts)
+    per_expert_s = count(shared_moe.experts[0])
+    active_s = count(shared_moe.router) + per_expert_s * shared_moe.top_k + shared_p
+    print(f"路由专家 {shared_moe.num_experts} 个（每 token 取 {shared_moe.top_k}）"
+          f" + 共享专家 {shared_moe.num_shared} 个（人人必过）")
+    print(f"总参数量     : {total_s:,}  （纯 MoE 为 {total:,}，多出 {total_s - total:,}）")
+    print(f"每 token 激活: {active_s:,}  ({active_s / total_s:.1%})")
+    print(f"其中共享部分 : {shared_p:,}  ({shared_p / active_s:.1%} 的激活参数是共享的)")
+    print("共享专家的参数人人都用，所以激活占比会明显高于纯 MoE；"
+          "换来的是路由专家不必重复学公共知识。")
+
+    with torch.no_grad():
+        flat = x.reshape(-1, D)
+        probs = F.softmax(shared_moe.router(flat), dim=-1)
+        _, top_i = torch.topk(probs, shared_moe.top_k, dim=-1)
+        load = torch.bincount(top_i.reshape(-1), minlength=shared_moe.num_experts)
+    print(f"路由负载分布 : {load.tolist()}")
+    print(f"负载均衡损失 : {shared_moe.aux_loss.item():.4f}  （只统计路由专家）")
